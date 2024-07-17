@@ -1,0 +1,41 @@
+- hosts: localhost
+  tasks:
+    - name: Install kubectl
+      shell: |
+        curl -LO "https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl"
+        chmod +x ./kubectl
+        mv ./kubectl /usr/local/bin/kubectl
+      args:
+        creates: /usr/local/bin/kubectl
+
+    - name: Install Helm
+      shell: |
+        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        creates: /usr/local/bin/helm
+
+    - name: Add Helm repo for Socks Shop
+      shell: helm repo add socks-shop https://microservices-demo.github.io/microservices-demo
+      args:
+        creates: /root/.cache/helm/repository/socks-shop-index.yaml
+
+    - name: Install Socks Shop using Helm
+      shell: helm install socks-shop socks-shop/socks-shop
+
+    - name: Deploy Prometheus
+      shell: |
+        kubectl apply -f https://github.com/prometheus-operator/prometheus-operator/raw/master/bundle.yaml
+
+    - name: Deploy Grafana
+      shell: |
+        kubectl apply -f https://raw.githubusercontent.com/grafana/helm-charts/main/charts/grafana/crds/crd-grafanas.yaml
+
+    - name: Configure HTTPS with Let's Encrypt
+      shell: |
+        kubectl apply -f https://raw.githubusercontent.com/jetstack/cert-manager/release-1.6/deploy/manifests/00-crds.yaml
+        kubectl create namespace cert-manager
+        helm repo add jetstack https://charts.jetstack.io
+        helm repo update
+        helm install cert-manager jetstack/cert-manager --namespace cert-manager --version v1.6.1
+        kubectl apply -f cert-issuer.yaml  # Define your cert-issuer.yaml file for Let's Encrypt
+        kubectl apply -f ingress.yaml  # Define your ingress.yaml file to use the certificate
